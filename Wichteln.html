@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wichteln – Lose ziehen</title>
+<style>
+  :root {
+    --green: #14532d; --green-dark: #0c3a1f; --red: #b91c1c; --red-dark: #7f1d1d;
+    --cream: #fdf8ee; --ink: #1f2937; --muted: #6b7280; --line: #e5dcc8; --gold: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--green-dark); color: var(--ink); line-height: 1.5; font-size: 17px;
+    min-height: 100vh;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { text-align: center; color: #fff; margin-bottom: 20px; }
+  header .emoji { font-size: 48px; line-height: 1; }
+  header h1 { margin: 8px 0 4px; font-size: 30px; }
+  header p { margin: 0; opacity: .85; }
+  .card { background: var(--cream); border-radius: 16px; padding: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+  h2 { margin: 0 0 6px; font-size: 21px; color: var(--green); }
+  .hint { color: var(--muted); font-size: 15px; margin: 0 0 14px; }
+  label { display: block; font-weight: 600; margin: 16px 0 6px; }
+  textarea, input[type=text] {
+    width: 100%; font: inherit; padding: 12px; border: 2px solid var(--line); border-radius: 10px;
+    background: #fff; color: var(--ink);
+  }
+  textarea { min-height: 200px; resize: vertical; }
+  textarea:focus, input:focus { outline: none; border-color: var(--green); }
+  .count { font-size: 15px; color: var(--muted); margin-top: 6px; }
+  .error { display: none; background: #fee2e2; color: var(--red-dark); border-radius: 10px; padding: 10px 12px; margin-top: 14px; font-weight: 600; }
+  button {
+    font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 12px 16px; cursor: pointer;
+    background: var(--green); color: #fff; min-height: 48px;
+  }
+  button:active { transform: translateY(1px); }
+  button.big { width: 100%; font-size: 19px; padding: 16px; margin-top: 18px; background: var(--red); }
+  button.secondary { background: #fff; color: var(--green); border: 2px solid var(--green); }
+  button.link { background: none; color: var(--muted); font-weight: 500; text-decoration: underline; min-height: 0; padding: 8px; }
+  .notice { background: #fef3c7; border-left: 5px solid var(--gold); border-radius: 8px; padding: 10px 12px; font-size: 15px; margin: 12px 0 16px; }
+  ul.lose { list-style: none; margin: 0; padding: 0; }
+  ul.lose li {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 12px 0; border-bottom: 1px solid var(--line);
+  }
+  ul.lose .name { flex: 1 1 140px; font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
+  ul.lose .done { color: var(--green); font-size: 14px; font-weight: 600; display: block; }
+  ul.lose button { padding: 10px 14px; min-height: 44px; font-size: 16px; }
+  .footer-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; align-items: center; }
+  .footer-actions .secondary { width: 100%; }
+  ol.steps { padding-left: 22px; margin: 8px 0 0; font-size: 15px; color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="emoji">🎁</div>
+    <h1>Wichteln</h1>
+    <p>Lose ziehen und geheim verschicken</p>
+  </header>
+
+  <section class="card" id="step1">
+    <h2>1. Wer macht mit?</h2>
+    <p class="hint">Schreibe jeden Namen in eine eigene Zeile.</p>
+    <textarea id="names" placeholder="Anna&#10;Ben&#10;Clara&#10;David" autocapitalize="words" spellcheck="false"></textarea>
+    <div class="count" id="count">Noch keine Namen eingetragen</div>
+
+    <label for="note">Budget <span style="font-weight:400;color:var(--muted)">(freiwillig)</span></label>
+    <input type="text" id="note" maxlength="40" placeholder="z. B. 20 €">
+
+    <div class="error" id="error"></div>
+    <button class="big" id="draw">🎲 Lose ziehen</button>
+  </section>
+
+  <section class="card" id="step2" hidden>
+    <h2>2. Lose verschicken</h2>
+    <p class="hint">Die Lose sind gezogen. Niemand hat sich selbst – und du siehst nicht, wer wen hat.</p>
+    <div class="notice">
+      <strong>Wichtig:</strong> Öffne die Lose nicht selbst (außer dein eigenes) und lass diese Seite offen, bis alle verschickt sind.
+    </div>
+    <ul class="lose" id="list"></ul>
+    <ol class="steps" id="howto"></ol>
+    <div class="footer-actions">
+      <button class="secondary" id="zip">📦 Alle Lose auf einmal speichern (ZIP)</button>
+      <button class="link" id="reset">Neu starten (neue Auslosung)</button>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const canShareFiles = (() => {
+  try {
+    const f = new File([new Uint8Array(1)], "t.pdf", { type: "application/pdf" });
+    return !!(navigator.canShare && navigator.canShare({ files: [f] }));
+  } catch (e) { return false; }
+})();
+
+let people = [];      // Namen in Eingabereihenfolge
+let assignment = [];  // assignment[i] = Index der Person, die people[i] beschenkt
+let noteText = "";
+const pdfCache = new Map();
+
+/* ---------- Eingabe ---------- */
+function parseNames() {
+  return $("names").value.split(/[\n,;]+/).map(s => s.trim().replace(/\s+/g, " ")).filter(Boolean);
+}
+$("names").addEventListener("input", () => {
+  const n = parseNames().length;
+  $("count").textContent = n === 0 ? "Noch keine Namen eingetragen" : n + (n === 1 ? " Name" : " Namen") + " eingetragen";
+  showError("");
+});
+function showError(msg) {
+  $("error").textContent = msg;
+  $("error").style.display = msg ? "block" : "none";
+}
+
+/* ---------- Auslosung ---------- */
+function randomInt(max) { // gleichverteilt in [0, max)
+  const buf = new Uint32Array(1);
+  const limit = Math.floor(0x100000000 / max) * max;
+  do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+  return buf[0] % max;
+}
+function drawAssignment(n) {
+  // Zufällig mischen und wiederholen, bis niemand sich selbst hat.
+  // Als Permutation bekommt und gibt jede Person genau ein Los.
+  for (;;) {
+    const p = Array.from({ length: n }, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    if (p.every((v, i) => v !== i)) return p;
+  }
+}
+
+$("draw").addEventListener("click", () => {
+  const names = parseNames();
+  if (names.length < 3) return showError("Bitte mindestens 3 Namen eintragen.");
+  const seen = new Set();
+  for (const n of names) {
+    const key = n.toLocaleLowerCase("de");
+    if (seen.has(key)) return showError("„" + n + "“ kommt doppelt vor. Bitte unterscheidbar machen, z. B. „" + n + " M.“");
+    seen.add(key);
+  }
+  people = names;
+  noteText = $("note").value.trim();
+  if (/^\d+([.,]\d+)?$/.test(noteText)) noteText += " €";
+  assignment = drawAssignment(people.length);
+  pdfCache.clear();
+  renderList();
+  $("step1").hidden = true;
+  $("step2").hidden = false;
+  window.scrollTo(0, 0);
+});
+
+$("reset").addEventListener("click", () => {
+  if (!confirm("Wirklich neu starten? Die bisherigen Lose werden ungültig.")) return;
+  people = []; assignment = []; pdfCache.clear();
+  $("step2").hidden = true;
+  $("step1").hidden = false;
+});
+
+/* ---------- Liste ---------- */
+function renderList() {
+  const ul = $("list");
+  ul.textContent = "";
+  people.forEach((name, i) => {
+    const li = document.createElement("li");
+    const label = document.createElement("div");
+    label.className = "name";
+    label.textContent = name;
+    const done = document.createElement("span");
+    done.className = "done";
+    label.appendChild(done);
+    li.appendChild(label);
+
+    if (canShareFiles) {
+      const b = document.createElement("button");
+      b.textContent = "📤 Senden";
+      b.addEventListener("click", async () => {
+        try {
+          await navigator.share({ files: [pdfFile(i)] });
+          done.textContent = "✓ gesendet";
+        } catch (e) {
+          if (e && e.name !== "AbortError") { download(pdfFile(i)); done.textContent = "✓ gespeichert"; }
+        }
+      });
+      li.appendChild(b);
+    }
+    const s = document.createElement("button");
+    s.className = canShareFiles ? "secondary" : "";
+    s.textContent = "💾 Speichern";
+    s.addEventListener("click", () => { download(pdfFile(i)); done.textContent = "✓ gespeichert"; });
+    li.appendChild(s);
+    ul.appendChild(li);
+  });
+
+  const steps = canShareFiles
+    ? ["Tippe bei jedem Namen auf „Senden“ und wähle z. B. WhatsApp.", "Schicke das Los an genau diese Person.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."]
+    : ["Klicke bei jedem Namen auf „Speichern“ (oder speichere alle auf einmal).", "Schicke jede Datei an die Person, deren Name im Dateinamen steht – z. B. per WhatsApp oder E-Mail.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."];
+  $("howto").textContent = "";
+  steps.forEach(t => { const li = document.createElement("li"); li.textContent = t; $("howto").appendChild(li); });
+}
+
+function fileName(i) {
+  return "Wichtel-Los für " + people[i].replace(/[\\/:*?"<>|]/g, "_") + ".pdf";
+}
+function pdfFile(i) {
+  if (!pdfCache.has(i)) {
+    const bytes = buildPdf([lotPage(people[i], people[assignment[i]], noteText)]);
+    pdfCache.set(i, new File([bytes], fileName(i), { type: "application/pdf" }));
+  }
+  return pdfCache.get(i);
+}
+function download(file) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(file);
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+$("zip").addEventListener("click", async () => {
+  const entries = [];
+  for (let i = 0; i < people.length; i++) {
+    const f = pdfFile(i);
+    entries.push({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
+  }
+  download(new File([buildZip(entries)], "Wichtel-Lose.zip", { type: "application/zip" }));
+});
+
+/* ---------- Los zeichnen (Canvas -> JPEG) ---------- */
+const W = 1240, H = 1754; // A4 bei 150 dpi
+const FONT = '-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+function newPage(bg, border) {
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = border; g.lineWidth = 14; g.strokeRect(60, 60, W - 120, H - 120);
+  g.lineWidth = 4; g.strokeRect(86, 86, W - 172, H - 172);
+  g.textAlign = "center"; g.textBaseline = "middle";
+  return [c, g];
+}
+function fitText(g, text, y, maxSize, weight, color) {
+  let size = maxSize;
+  do { g.font = weight + " " + size + "px " + FONT; size -= 4; }
+  while (g.measureText(text).width > W - 260 && size > 28);
+  g.fillStyle = color;
+  g.fillText(text, W / 2, y, W - 240);
+}
+function wrapText(g, text, y, size, color, lineHeight) {
+  g.font = "400 " + size + "px " + FONT;
+  g.fillStyle = color;
+  const words = text.split(" ");
+  let line = "";
+  for (const w of words) {
+    const test = line ? line + " " + w : w;
+    if (g.measureText(test).width > W - 300 && line) {
+      g.fillText(line, W / 2, y); y += lineHeight; line = w;
+    } else line = test;
+  }
+  if (line) g.fillText(line, W / 2, y, W - 260);
+  return y + lineHeight;
+}
+function toJpeg(canvas) {
+  const b64 = canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function lotPage(forName, giftTo, budget) {
+  const [c, g] = newPage("#fdf8ee", "#b91c1c");
+  g.font = "150px " + FONT; g.fillText("🎁", W / 2, 290);
+  fitText(g, "Wichtel-Los für " + forName, 480, 72, "700", "#14532d");
+  fitText(g, "Auf dein Geschenk freut sich:", 720, 64, "400", "#374151");
+  fitText(g, giftTo, 940, 220, "700", "#b91c1c");
+  if (budget) fitText(g, "Budget: " + budget, 1220, 68, "700", "#374151");
+  fitText(g, "🤫 Pssst – nicht weitersagen!", 1480, 52, "700", "#14532d");
+  return toJpeg(c);
+}
+
+/* ---------- PDF (eine JPEG-Seite pro Blatt) ---------- */
+function buildPdf(jpegs) {
+  const enc = new TextEncoder();
+  const parts = [], offsets = [];
+  let len = 0;
+  const push = x => { const b = typeof x === "string" ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (id, body, stream) => {
+    offsets[id] = len;
+    push(id + " 0 obj\n" + body + "\n");
+    if (stream) { push("stream\n"); push(stream); push("\nendstream\n"); }
+    push("endobj\n");
+  };
+  push("%PDF-1.4\n%âãÏÓ\n");
+  const n = jpegs.length;
+  const kids = jpegs.map((_, i) => (3 + 3 * i) + " 0 R").join(" ");
+  obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2, "<< /Type /Pages /Kids [" + kids + "] /Count " + n + " >>");
+  jpegs.forEach((jpg, i) => {
+    const page = 3 + 3 * i, img = page + 1, cont = page + 2;
+    const content = enc.encode("q 595 0 0 842 0 0 cm /Im0 Do Q");
+    obj(page, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 " + img + " 0 R >> >> /Contents " + cont + " 0 R >>");
+    obj(img, "<< /Type /XObject /Subtype /Image /Width " + W + " /Height " + H + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + jpg.length + " >>", jpg);
+    obj(cont, "<< /Length " + content.length + " >>", content);
+  });
+  const total = 3 + 3 * n;
+  const xref = len;
+  let x = "xref\n0 " + total + "\n0000000000 65535 f \n";
+  for (let id = 1; id < total; id++) x += String(offsets[id]).padStart(10, "0") + " 00000 n \n";
+  push(x + "trailer\n<< /Size " + total + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+  return concat(parts, len);
+}
+function concat(parts, len) {
+  const out = new Uint8Array(len);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+
+/* ---------- ZIP (unkomprimiert) ---------- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(data) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function buildZip(entries) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let len = 0;
+  const push = (arr, b) => { arr.push(b); return b.length; };
+  const header = (sig, size) => { const b = new Uint8Array(size); const v = new DataView(b.buffer); v.setUint32(0, sig, true); return [b, v]; };
+  for (const e of entries) {
+    const name = enc.encode(e.name), crc = crc32(e.data), offset = len;
+    const [lh, lv] = header(0x04034b50, 30);
+    lv.setUint16(4, 20, true); lv.setUint16(6, 0x0800, true); lv.setUint16(8, 0, true);
+    lv.setUint16(10, 0, true); lv.setUint16(12, 0x21, true);
+    lv.setUint32(14, crc, true); lv.setUint32(18, e.data.length, true); lv.setUint32(22, e.data.length, true);
+    lv.setUint16(26, name.length, true);
+    len += push(parts, lh) + push(parts, name) + push(parts, e.data);
+    const [ch, cv] = header(0x02014b50, 46);
+    cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x0800, true);
+    cv.setUint16(14, 0x21, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, e.data.length, true); cv.setUint32(24, e.data.length, true);
+    cv.setUint16(28, name.length, true); cv.setUint32(42, offset, true);
+    central.push(ch, name);
+  }
+  const cdStart = len;
+  let cdLen = 0;
+  for (const c of central) { parts.push(c); cdLen += c.length; }
+  const [eh, ev] = header(0x06054b50, 22);
+  ev.setUint16(8, entries.length, true); ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, cdLen, true); ev.setUint32(16, cdStart, true);
+  parts.push(eh);
+  return concat(parts, len + cdLen + 22);
+}
+</script>
+</body>
+</html>
