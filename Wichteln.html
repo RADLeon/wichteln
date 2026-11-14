@@ -221,7 +221,7 @@ function renderList() {
 }
 
 function fileName(i) {
-  return "Wichtel-Los für " + people[i].replace(/[\\/:*?"<>|]/g, "_") + ".pdf";
+  return "Wichtellos für " + people[i].replace(/[\\/:*?"<>|]/g, "_") + " " + YEAR + ".pdf";
 }
 function pdfFile(i) {
   if (!pdfCache.has(i)) {
@@ -232,7 +232,7 @@ function pdfFile(i) {
 }
 function overviewFile() {
   if (!pdfCache.has("overview")) {
-    pdfCache.set("overview", new File([buildPdf(overviewPages())], "Wichtel-Gesamtübersicht (geheim).pdf", { type: "application/pdf" }));
+    pdfCache.set("overview", new File([buildPdf(overviewPages())], "Wichtel-Gesamtübersicht " + YEAR + " (geheim).pdf", { type: "application/pdf" }));
   }
   return pdfCache.get("overview");
 }
@@ -254,29 +254,69 @@ $("zip").addEventListener("click", async () => {
   }
   const o = overviewFile();
   entries.push({ name: o.name, data: new Uint8Array(await o.arrayBuffer()) });
-  download(new File([buildZip(entries)], "Wichtel-Lose.zip", { type: "application/zip" }));
+  download(new File([buildZip(entries)], "Wichtellose " + YEAR + ".zip", { type: "application/zip" }));
 });
 
 /* ---------- Los zeichnen (Canvas -> JPEG) ---------- */
 const W = 1240, H = 1754; // A4 bei 150 dpi
 const FONT = '-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
-function newPage(bg, border) {
+const SERIF = 'Georgia, "Times New Roman", serif';
+const YEAR = new Date().getFullYear();
+const C = { cream: "#fbf6ea", green: "#14532d", green2: "#3b7353", red: "#a61b1b", gold: "#b8923a", goldLight: "#e3c887", grey: "#4b5563" };
+
+function newPage(bg, frame, accent) {
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const g = c.getContext("2d");
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.strokeStyle = border; g.lineWidth = 14; g.strokeRect(60, 60, W - 120, H - 120);
-  g.lineWidth = 4; g.strokeRect(86, 86, W - 172, H - 172);
+  g.strokeStyle = frame; g.lineWidth = 10; g.strokeRect(56, 56, W - 112, H - 112);
+  g.strokeStyle = accent; g.lineWidth = 3; g.strokeRect(80, 80, W - 160, H - 160);
   g.textAlign = "center"; g.textBaseline = "middle";
   return [c, g];
 }
-function fitText(g, text, y, maxSize, weight, color) {
+function fitText(g, text, y, maxSize, style, color, font, spacing) {
+  if ("letterSpacing" in g) g.letterSpacing = (spacing || 0) + "px";
   let size = maxSize;
-  do { g.font = weight + " " + size + "px " + FONT; size -= 4; }
+  do { g.font = style + " " + size + "px " + (font || FONT); size -= 4; }
   while (g.measureText(text).width > W - 260 && size > 28);
   g.fillStyle = color;
   g.fillText(text, W / 2, y, W - 240);
+  if ("letterSpacing" in g) g.letterSpacing = "0px";
+}
+function star(g, cx, cy, r, color) { // schlichter vierzackiger Stern
+  g.fillStyle = color;
+  g.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const rad = i % 2 ? r * 0.32 : r, a = i * Math.PI / 4 - Math.PI / 2;
+    g.lineTo(cx + rad * Math.cos(a), cy + rad * Math.sin(a));
+  }
+  g.closePath(); g.fill();
+}
+function divider(g, y, color) {
+  g.strokeStyle = color; g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(W / 2 - 280, y); g.lineTo(W / 2 - 50, y);
+  g.moveTo(W / 2 + 50, y); g.lineTo(W / 2 + 280, y);
+  g.stroke();
+  star(g, W / 2, y, 24, color);
+}
+function tree(g, cx, base, h, color) {
+  g.fillStyle = "#7c5a3a";
+  g.fillRect(cx - h * 0.05, base - h * 0.12, h * 0.1, h * 0.12);
+  g.fillStyle = color;
+  for (let i = 0; i < 3; i++) {
+    const top = base - h + i * h * 0.24, half = h * (0.2 + 0.09 * i);
+    g.beginPath();
+    g.moveTo(cx, top); g.lineTo(cx + half, top + h * 0.4); g.lineTo(cx - half, top + h * 0.4);
+    g.closePath(); g.fill();
+  }
+}
+function trees(g, base) {
+  tree(g, W / 2 - 150, base, 150, C.green2);
+  tree(g, W / 2 + 150, base, 150, C.green2);
+  tree(g, W / 2, base, 220, C.green);
+  star(g, W / 2, base - 232, 22, C.gold);
 }
 function toJpeg(canvas) {
   const b64 = canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
@@ -286,25 +326,33 @@ function toJpeg(canvas) {
   return out;
 }
 function lotPage(forName, giftTo) {
-  const [c, g] = newPage("#fdf8ee", "#b91c1c");
-  fitText(g, "Wichtel-Los für " + forName, 440, 80, "700", "#14532d");
-  fitText(g, "Auf dein Geschenk freut sich:", 760, 68, "400", "#374151");
-  fitText(g, giftTo, 1020, 240, "700", "#b91c1c");
+  const [c, g] = newPage(C.cream, C.green, C.gold);
+  divider(g, 250, C.gold);
+  fitText(g, "WICHTELLOS " + YEAR, 370, 46, "700", C.green, FONT, 10);
+  fitText(g, "für " + forName, 490, 88, "700", C.green, SERIF);
+  fitText(g, "Auf dein Geschenk freut sich", 770, 62, "italic 400", C.grey, SERIF);
+  fitText(g, giftTo, 990, 230, "700", C.red, SERIF);
+  divider(g, 1210, C.gold);
+  trees(g, 1570);
   return toJpeg(c);
 }
 const ROWS_PER_PAGE = 16;
 function overviewPages() {
   const pages = [];
   // Deckblatt, damit Vorschaubilder nichts verraten
-  const [c0, g0] = newPage("#14532d", "#f5d98b");
-  fitText(g0, "Wichtel-Gesamtübersicht", 620, 92, "700", "#ffffff");
-  fitText(g0, "Vertraulich – nur im Notfall öffnen", 820, 56, "700", "#f5d98b");
-  fitText(g0, "Alle Paarungen stehen ab Seite 2.", 980, 48, "400", "#e7f3ea");
+  const [c0, g0] = newPage(C.green, C.goldLight, C.goldLight);
+  divider(g0, 470, C.goldLight);
+  fitText(g0, "Wichtel-Gesamtübersicht", 630, 88, "700", "#ffffff", SERIF);
+  fitText(g0, String(YEAR), 760, 64, "700", C.goldLight, SERIF);
+  fitText(g0, "Vertraulich – nur im Notfall öffnen", 940, 52, "italic 400", C.goldLight, SERIF);
+  fitText(g0, "Alle Paarungen stehen ab Seite 2.", 1040, 44, "400", "#e7f3ea");
+  divider(g0, 1200, C.goldLight);
   pages.push(toJpeg(c0));
   const total = Math.ceil(people.length / ROWS_PER_PAGE);
   for (let p = 0; p < total; p++) {
-    const [c, g] = newPage("#fdf8ee", "#b91c1c");
-    fitText(g, "Wer beschenkt wen?" + (total > 1 ? "  (" + (p + 1) + "/" + total + ")" : ""), 230, 68, "700", "#14532d");
+    const [c, g] = newPage(C.cream, C.green, C.gold);
+    fitText(g, "Wer beschenkt wen? " + YEAR + (total > 1 ? "  (" + (p + 1) + "/" + total + ")" : ""), 220, 64, "700", C.green, SERIF);
+    divider(g, 310, C.gold);
     const rows = people.slice(p * ROWS_PER_PAGE, (p + 1) * ROWS_PER_PAGE);
     rows.forEach((name, r) => {
       const y = 400 + r * 78;
