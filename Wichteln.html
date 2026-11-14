@@ -214,8 +214,8 @@ function renderList() {
   addRow("Gesamtübersicht", "Alle Paarungen – nur für den Notfall, z. B. wenn jemand sein Los verliert. Am besten ungeöffnet aufbewahren.", overviewFile, "overview");
 
   const steps = canShareFiles
-    ? ["Tippe bei jedem Namen auf „Teilen“ und wähle im Menü z. B. WhatsApp – oder auf „Speichern“, um die Datei abzulegen.", "Schicke das Los an genau diese Person.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."]
-    : ["Klicke bei jedem Namen auf „Speichern“ (oder speichere alle auf einmal).", "Schicke jede Datei an die Person, deren Name im Dateinamen steht – z. B. per WhatsApp oder E-Mail.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."];
+    ? ["Tippe bei jedem Namen auf „Teilen“ und wähle im Menü z. B. WhatsApp – oder auf „Speichern“, um die Datei abzulegen.", "Schicke das Los an genau diese Person.", "Jede Person öffnet ihr Los (PDF) und scrollt zur zweiten Seite – dort steht, wen sie beschenkt."]
+    : ["Klicke bei jedem Namen auf „Speichern“ (oder speichere alle auf einmal).", "Schicke jede Datei an die Person, deren Name im Dateinamen steht – z. B. per WhatsApp oder E-Mail.", "Jede Person öffnet ihr Los (PDF) und scrollt zur zweiten Seite – dort steht, wen sie beschenkt."];
   $("howto").textContent = "";
   steps.forEach(t => { const li = document.createElement("li"); li.textContent = t; $("howto").appendChild(li); });
 }
@@ -225,7 +225,7 @@ function fileName(i) {
 }
 function pdfFile(i) {
   if (!pdfCache.has(i)) {
-    const bytes = buildPdf([lotPage(people[i], people[assignment[i]])]);
+    const bytes = buildPdf([lotCover(people[i]), lotPage(people[i], people[assignment[i]])]);
     pdfCache.set(i, new File([bytes], fileName(i), { type: "application/pdf" }));
   }
   return pdfCache.get(i);
@@ -324,6 +324,24 @@ function toJpeg(canvas) {
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
+}
+function lotCover(forName) { // Seite 1: verrät nichts, erklärt das Weiterblättern
+  const [c, g] = newPage(C.cream, C.green, C.gold);
+  divider(g, 250, C.gold);
+  fitText(g, "WICHTELLOS " + YEAR, 370, 46, "700", C.green, FONT, 10);
+  fitText(g, "für " + forName, 530, 120, "700", C.green, SERIF);
+  fitText(g, "Wen du beschenkst,", 800, 62, "italic 400", C.grey, SERIF);
+  fitText(g, "steht auf der nächsten Seite.", 885, 62, "italic 400", C.grey, SERIF);
+  divider(g, 1010, C.gold);
+  fitText(g, "Bitte nach unten scrollen", 1150, 64, "700", C.red);
+  fitText(g, "(am Handy: mit dem Finger nach oben wischen)", 1235, 40, "400", C.grey);
+  g.strokeStyle = C.red; g.lineWidth = 16; g.lineCap = "round"; g.lineJoin = "round";
+  for (const y of [1350, 1440]) {
+    g.beginPath();
+    g.moveTo(W / 2 - 90, y); g.lineTo(W / 2, y + 80); g.lineTo(W / 2 + 90, y);
+    g.stroke();
+  }
+  return toJpeg(c);
 }
 function lotPage(forName, giftTo) {
   const [c, g] = newPage(C.cream, C.green, C.gold);
