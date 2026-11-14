@@ -49,7 +49,10 @@
   ul.lose .name { flex: 1 1 140px; font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
   ul.lose .done { color: var(--green); font-size: 14px; font-weight: 600; display: block; }
   ul.lose button { padding: 10px 14px; min-height: 44px; font-size: 16px; }
-  ul.lose button.link { font-size: 14px; padding: 10px 6px; }
+  ul.lose .actions { display: flex; gap: 8px; flex: 0 1 auto; }
+  ul.lose .actions button { flex: 1 1 auto; white-space: nowrap; }
+  ul.lose .sub { display: block; font-weight: 400; font-size: 14px; color: var(--muted); }
+  ul.lose li.overview { border-bottom: 0; border-top: 3px double var(--line); margin-top: 6px; padding-top: 16px; }
   .footer-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; align-items: center; }
   .footer-actions .secondary { width: 100%; }
   ol.steps { padding-left: 22px; margin: 8px 0 0; font-size: 15px; color: var(--muted); }
@@ -70,9 +73,6 @@
     <textarea id="names" placeholder="Anna&#10;Ben&#10;Clara&#10;David" autocapitalize="words" spellcheck="false"></textarea>
     <div class="count" id="count">Noch keine Namen eingetragen</div>
 
-    <label for="note">Budget <span style="font-weight:400;color:var(--muted)">(freiwillig)</span></label>
-    <input type="text" id="note" maxlength="40" placeholder="z. B. 20 €">
-
     <div class="error" id="error"></div>
     <button class="big" id="draw">🎲 Lose ziehen</button>
   </section>
@@ -86,7 +86,7 @@
     <ul class="lose" id="list"></ul>
     <ol class="steps" id="howto"></ol>
     <div class="footer-actions">
-      <button class="secondary" id="zip">📦 Alle Lose auf einmal speichern (ZIP)</button>
+      <button class="secondary" id="zip">📦 Alle Lose + Übersicht speichern (ZIP)</button>
       <button class="link" id="reset">Neu starten (neue Auslosung)</button>
     </div>
   </section>
@@ -105,7 +105,6 @@ const canShareFiles = (() => {
 
 let people = [];      // Namen in Eingabereihenfolge
 let assignment = [];  // assignment[i] = Index der Person, die people[i] beschenkt
-let noteText = "";
 const pdfCache = new Map();
 
 /* ---------- Eingabe ---------- */
@@ -152,8 +151,6 @@ $("draw").addEventListener("click", () => {
     seen.add(key);
   }
   people = names;
-  noteText = $("note").value.trim();
-  if (/^\d+([.,]\d+)?$/.test(noteText)) noteText += " €";
   assignment = drawAssignment(people.length);
   pdfCache.clear();
   renderList();
@@ -173,39 +170,51 @@ $("reset").addEventListener("click", () => {
 function renderList() {
   const ul = $("list");
   ul.textContent = "";
-  people.forEach((name, i) => {
+  const addRow = (title, sub, getFile, cls) => {
     const li = document.createElement("li");
+    if (cls) li.className = cls;
     const label = document.createElement("div");
     label.className = "name";
-    label.textContent = name;
+    label.textContent = title;
+    if (sub) {
+      const small = document.createElement("span");
+      small.className = "sub";
+      small.textContent = sub;
+      label.appendChild(small);
+    }
     const done = document.createElement("span");
     done.className = "done";
     label.appendChild(done);
     li.appendChild(label);
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    li.appendChild(actions);
 
+    const s = document.createElement("button");
+    s.className = "secondary";
+    s.textContent = "💾 Speichern";
+    s.addEventListener("click", () => { download(getFile()); done.textContent = "✓ gespeichert"; });
+    actions.appendChild(s);
     if (canShareFiles) {
       const b = document.createElement("button");
       b.textContent = "📤 Teilen";
       b.addEventListener("click", async () => {
         try {
-          await navigator.share({ files: [pdfFile(i)] });
+          await navigator.share({ files: [getFile()] });
           done.textContent = "✓ geteilt";
         } catch (e) {
-          if (e && e.name !== "AbortError") { download(pdfFile(i)); done.textContent = "✓ gespeichert"; }
+          if (e && e.name !== "AbortError") { download(getFile()); done.textContent = "✓ gespeichert"; }
         }
       });
-      li.appendChild(b);
+      actions.appendChild(b);
     }
-    const s = document.createElement("button");
-    s.className = canShareFiles ? "link" : "";
-    s.textContent = canShareFiles ? "speichern" : "💾 Speichern";
-    s.addEventListener("click", () => { download(pdfFile(i)); done.textContent = "✓ gespeichert"; });
-    li.appendChild(s);
     ul.appendChild(li);
-  });
+  };
+  people.forEach((name, i) => addRow(name, "", () => pdfFile(i)));
+  addRow("Gesamtübersicht", "Alle Paarungen – nur für den Notfall, z. B. wenn jemand sein Los verliert. Am besten ungeöffnet aufbewahren.", overviewFile, "overview");
 
   const steps = canShareFiles
-    ? ["Tippe bei jedem Namen auf „Teilen“ und wähle im Menü z. B. WhatsApp.", "Schicke das Los an genau diese Person.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."]
+    ? ["Tippe bei jedem Namen auf „Teilen“ und wähle im Menü z. B. WhatsApp – oder auf „Speichern“, um die Datei abzulegen.", "Schicke das Los an genau diese Person.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."]
     : ["Klicke bei jedem Namen auf „Speichern“ (oder speichere alle auf einmal).", "Schicke jede Datei an die Person, deren Name im Dateinamen steht – z. B. per WhatsApp oder E-Mail.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."];
   $("howto").textContent = "";
   steps.forEach(t => { const li = document.createElement("li"); li.textContent = t; $("howto").appendChild(li); });
@@ -216,10 +225,16 @@ function fileName(i) {
 }
 function pdfFile(i) {
   if (!pdfCache.has(i)) {
-    const bytes = buildPdf([lotPage(people[i], people[assignment[i]], noteText)]);
+    const bytes = buildPdf([lotPage(people[i], people[assignment[i]])]);
     pdfCache.set(i, new File([bytes], fileName(i), { type: "application/pdf" }));
   }
   return pdfCache.get(i);
+}
+function overviewFile() {
+  if (!pdfCache.has("overview")) {
+    pdfCache.set("overview", new File([buildPdf(overviewPages())], "Wichtel-Gesamtübersicht (geheim).pdf", { type: "application/pdf" }));
+  }
+  return pdfCache.get("overview");
 }
 function download(file) {
   const a = document.createElement("a");
@@ -237,6 +252,8 @@ $("zip").addEventListener("click", async () => {
     const f = pdfFile(i);
     entries.push({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
   }
+  const o = overviewFile();
+  entries.push({ name: o.name, data: new Uint8Array(await o.arrayBuffer()) });
   download(new File([buildZip(entries)], "Wichtel-Lose.zip", { type: "application/zip" }));
 });
 
@@ -261,20 +278,6 @@ function fitText(g, text, y, maxSize, weight, color) {
   g.fillStyle = color;
   g.fillText(text, W / 2, y, W - 240);
 }
-function wrapText(g, text, y, size, color, lineHeight) {
-  g.font = "400 " + size + "px " + FONT;
-  g.fillStyle = color;
-  const words = text.split(" ");
-  let line = "";
-  for (const w of words) {
-    const test = line ? line + " " + w : w;
-    if (g.measureText(test).width > W - 300 && line) {
-      g.fillText(line, W / 2, y); y += lineHeight; line = w;
-    } else line = test;
-  }
-  if (line) g.fillText(line, W / 2, y, W - 260);
-  return y + lineHeight;
-}
 function toJpeg(canvas) {
   const b64 = canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
   const bin = atob(b64);
@@ -282,15 +285,41 @@ function toJpeg(canvas) {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-function lotPage(forName, giftTo, budget) {
+function lotPage(forName, giftTo) {
   const [c, g] = newPage("#fdf8ee", "#b91c1c");
-  g.font = "150px " + FONT; g.fillText("🎁", W / 2, 290);
-  fitText(g, "Wichtel-Los für " + forName, 480, 72, "700", "#14532d");
-  fitText(g, "Auf dein Geschenk freut sich:", 720, 64, "400", "#374151");
-  fitText(g, giftTo, 940, 220, "700", "#b91c1c");
-  if (budget) fitText(g, "Budget: " + budget, 1220, 68, "700", "#374151");
-  fitText(g, "🤫 Pssst – nicht weitersagen!", 1480, 52, "700", "#14532d");
+  fitText(g, "Wichtel-Los für " + forName, 440, 80, "700", "#14532d");
+  fitText(g, "Auf dein Geschenk freut sich:", 760, 68, "400", "#374151");
+  fitText(g, giftTo, 1020, 240, "700", "#b91c1c");
   return toJpeg(c);
+}
+const ROWS_PER_PAGE = 16;
+function overviewPages() {
+  const pages = [];
+  // Deckblatt, damit Vorschaubilder nichts verraten
+  const [c0, g0] = newPage("#14532d", "#f5d98b");
+  fitText(g0, "Wichtel-Gesamtübersicht", 620, 92, "700", "#ffffff");
+  fitText(g0, "Vertraulich – nur im Notfall öffnen", 820, 56, "700", "#f5d98b");
+  fitText(g0, "Alle Paarungen stehen ab Seite 2.", 980, 48, "400", "#e7f3ea");
+  pages.push(toJpeg(c0));
+  const total = Math.ceil(people.length / ROWS_PER_PAGE);
+  for (let p = 0; p < total; p++) {
+    const [c, g] = newPage("#fdf8ee", "#b91c1c");
+    fitText(g, "Wer beschenkt wen?" + (total > 1 ? "  (" + (p + 1) + "/" + total + ")" : ""), 230, 68, "700", "#14532d");
+    const rows = people.slice(p * ROWS_PER_PAGE, (p + 1) * ROWS_PER_PAGE);
+    rows.forEach((name, r) => {
+      const y = 400 + r * 78;
+      g.font = "700 44px " + FONT;
+      g.fillStyle = "#1f2937"; g.textAlign = "right";
+      g.fillText(name, W / 2 - 60, y, 420);
+      g.fillStyle = "#6b7280"; g.textAlign = "center";
+      g.fillText("→", W / 2, y);
+      g.fillStyle = "#b91c1c"; g.textAlign = "left";
+      g.fillText(people[assignment[p * ROWS_PER_PAGE + r]], W / 2 + 60, y, 420);
+    });
+    g.textAlign = "center";
+    pages.push(toJpeg(c));
+  }
+  return pages;
 }
 
 /* ---------- PDF (eine JPEG-Seite pro Blatt) ---------- */
