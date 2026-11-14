@@ -10,6 +10,6 @@ Ein kleines Tool zum Auslosen von Wichtel-Geschenken. Es besteht aus einer einzi
 4. Für jede Person entsteht ein PDF „Wichtellos für NAME JAHR.pdf“. Diese Datei speichern oder direkt teilen und an genau diese Person schicken, z. B. per WhatsApp.
 5. Zusätzlich die „Gesamtübersicht“ mit allen Paarungen speichern. Sie ist für den Notfall gedacht, falls jemand sein Los verliert, und sollte sonst ungeöffnet bleiben.
 
-Jede Person bekommt genau einen anderen Namen zugelost, niemand sich selbst. Das Ergebnis wird im Tool nicht angezeigt. Wer die Lose verschickt, sollte fremde PDFs nicht öffnen, denn der gezogene Name steht direkt auf der ersten Seite.
+Jede Person bekommt genau einen anderen Namen zugelost, niemand sich selbst. Das Ergebnis wird im Tool nicht angezeigt. Die erste Seite jedes Loses ist ein Deckblatt, damit die Vorschau in WhatsApp nichts verrät; der gezogene Name steht auf Seite 2. Wer die Lose verschickt, sollte fremde PDFs trotzdem nicht öffnen.
 
 Die Auslosung wird nirgends gespeichert oder übertragen. Wird die Seite geschlossen, bevor alle Lose gesichert sind, muss neu gezogen werden.
