@@ -49,6 +49,7 @@
   ul.lose .name { flex: 1 1 140px; font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
   ul.lose .done { color: var(--green); font-size: 14px; font-weight: 600; display: block; }
   ul.lose button { padding: 10px 14px; min-height: 44px; font-size: 16px; }
+  ul.lose button.link { font-size: 14px; padding: 10px 6px; }
   .footer-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; align-items: center; }
   .footer-actions .secondary { width: 100%; }
   ol.steps { padding-left: 22px; margin: 8px 0 0; font-size: 15px; color: var(--muted); }
@@ -97,7 +98,8 @@ const $ = id => document.getElementById(id);
 const canShareFiles = (() => {
   try {
     const f = new File([new Uint8Array(1)], "t.pdf", { type: "application/pdf" });
-    return !!(navigator.canShare && navigator.canShare({ files: [f] }));
+    if (typeof navigator.share !== "function") return false;
+    return !navigator.canShare || navigator.canShare({ files: [f] });
   } catch (e) { return false; }
 })();
 
@@ -183,11 +185,11 @@ function renderList() {
 
     if (canShareFiles) {
       const b = document.createElement("button");
-      b.textContent = "📤 Senden";
+      b.textContent = "📤 Teilen";
       b.addEventListener("click", async () => {
         try {
           await navigator.share({ files: [pdfFile(i)] });
-          done.textContent = "✓ gesendet";
+          done.textContent = "✓ geteilt";
         } catch (e) {
           if (e && e.name !== "AbortError") { download(pdfFile(i)); done.textContent = "✓ gespeichert"; }
         }
@@ -195,15 +197,15 @@ function renderList() {
       li.appendChild(b);
     }
     const s = document.createElement("button");
-    s.className = canShareFiles ? "secondary" : "";
-    s.textContent = "💾 Speichern";
+    s.className = canShareFiles ? "link" : "";
+    s.textContent = canShareFiles ? "speichern" : "💾 Speichern";
     s.addEventListener("click", () => { download(pdfFile(i)); done.textContent = "✓ gespeichert"; });
     li.appendChild(s);
     ul.appendChild(li);
   });
 
   const steps = canShareFiles
-    ? ["Tippe bei jedem Namen auf „Senden“ und wähle z. B. WhatsApp.", "Schicke das Los an genau diese Person.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."]
+    ? ["Tippe bei jedem Namen auf „Teilen“ und wähle im Menü z. B. WhatsApp.", "Schicke das Los an genau diese Person.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."]
     : ["Klicke bei jedem Namen auf „Speichern“ (oder speichere alle auf einmal).", "Schicke jede Datei an die Person, deren Name im Dateinamen steht – z. B. per WhatsApp oder E-Mail.", "Jede Person öffnet ihr Los (PDF) und sieht sofort, wen sie beschenkt."];
   $("howto").textContent = "";
   steps.forEach(t => { const li = document.createElement("li"); li.textContent = t; $("howto").appendChild(li); });
